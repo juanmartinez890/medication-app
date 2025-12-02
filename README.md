@@ -21,6 +21,8 @@ I also planned to use SQS to handle dose creation asynchronously. The idea is th
 
 For the database model, I decided to store the medication schedule inside the medication record. The requirements state that a medication cannot exist without a schedule, so separating them would add unnecessary complexity. For doses, I decided to pre-generate all dose records for the next 7 days. This reduces computation during reads because the “upcoming doses” endpoint can simply query existing items instead of calculating dates every time. Storage is cheaper than repeated compute, and this design also sets us up for future analytics like tracking missed doses.
 
+<img width="884" height="515" alt="arch-design-backend" src="https://github.com/user-attachments/assets/c2da91d4-c8a9-417d-b020-f2f7477b70a3" />
+
 #### Why the Keys Look Like This (PK and SK Design)
 
 The DynamoDB keys follow this pattern:
