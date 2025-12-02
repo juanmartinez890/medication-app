@@ -1,6 +1,8 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { MedicationService } from "../services/medicationService";
 import { MedicationRepository } from "../repositories/medicationRepository";
+import { DoseGenerationService } from "../services/doseGenerationService";
+import { DoseRepository } from "../repositories/doseRepository";
 import { SQSService } from "../services/sqsService";
 import { CreateMedicationRequest } from "../domain/types";
 import { ValidationError } from "../utils/validation";
@@ -22,10 +24,16 @@ export const handler = async (
 
     const request: CreateMedicationRequest = JSON.parse(event.body);
 
-    // Initialize service and repository
-    const repository = new MedicationRepository(TABLE_NAME);
+    // Initialize services and repositories
+    const medicationRepository = new MedicationRepository(TABLE_NAME);
+    const doseRepository = new DoseRepository(TABLE_NAME);
+    const doseGenerationService = new DoseGenerationService(doseRepository);
     const sqsService = QUEUE_URL ? new SQSService(QUEUE_URL) : undefined;
-    const service = new MedicationService(repository, sqsService);
+    const service = new MedicationService(
+      medicationRepository,
+      doseGenerationService,
+      sqsService
+    );
 
     // Create medication
     const medication = await service.createMedication(request);

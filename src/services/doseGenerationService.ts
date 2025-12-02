@@ -4,7 +4,8 @@ import { getCurrentTimestamp } from "../utils/dateUtils";
 
 export class DoseGenerationService {
   private repository: DoseRepository;
-  private readonly DAYS_AHEAD = 30;
+  // Number of days ahead to generate doses
+  private readonly DAYS_AHEAD = 7;
 
   constructor(repository: DoseRepository) {
     this.repository = repository;

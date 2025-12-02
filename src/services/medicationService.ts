@@ -4,6 +4,7 @@ import {
   DoseGenerationMessage,
 } from "../domain/types";
 import { MedicationRepository } from "../repositories/medicationRepository";
+import { DoseGenerationService } from "./doseGenerationService";
 import { validateMedicationRequest } from "../utils/validation";
 import { getCurrentTimestamp } from "../utils/dateUtils";
 import { v4 as uuidv4 } from "uuid";
@@ -11,10 +12,16 @@ import { SQSService } from "./sqsService";
 
 export class MedicationService {
   private repository: MedicationRepository;
+  private doseGenerationService: DoseGenerationService | null;
   private sqsService: SQSService | null;
 
-  constructor(repository: MedicationRepository, sqsService?: SQSService) {
+  constructor(
+    repository: MedicationRepository,
+    doseGenerationService?: DoseGenerationService,
+    sqsService?: SQSService
+  ) {
     this.repository = repository;
+    this.doseGenerationService = doseGenerationService || null;
     this.sqsService = sqsService || null;
   }
 
@@ -49,8 +56,37 @@ export class MedicationService {
     // Save to repository
     const savedMedication = await this.repository.create(medication);
 
-    // Publish message to SQS for dose generation (async, don't wait)
-    if (this.sqsService && savedMedication.active) {
+    // Generate doses synchronously if service is available
+    if (this.doseGenerationService && savedMedication.active) {
+      const message: DoseGenerationMessage = {
+        medicationId: savedMedication.medicationId,
+        careRecipientId: savedMedication.careRecipientId,
+        recurrence: savedMedication.recurrence,
+        timesOfDay: savedMedication.timesOfDay,
+        daysOfWeek: savedMedication.daysOfWeek,
+        active: savedMedication.active,
+      };
+
+      try {
+        const doseCount = await this.doseGenerationService.generateDoses(
+          message
+        );
+        console.log(
+          `Generated ${doseCount} doses for medication ${savedMedication.medicationId}`
+        );
+      } catch (error) {
+        console.error("Failed to generate doses synchronously:", error);
+        // Fallback to SQS if synchronous generation fails
+        if (this.sqsService) {
+          this.sqsService
+            .sendDoseGenerationMessage(message)
+            .catch((sqsError) => {
+              console.error("Failed to send dose generation message to SQS:", sqsError);
+            });
+        }
+      }
+    } else if (this.sqsService && savedMedication.active) {
+      // Fallback to SQS if dose generation service is not available
       const message: DoseGenerationMessage = {
         medicationId: savedMedication.medicationId,
         careRecipientId: savedMedication.careRecipientId,
