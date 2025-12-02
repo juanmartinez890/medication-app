@@ -15,6 +15,7 @@ provider:
       allowOrigins:
         - "http://localhost:5173"
         - "http://localhost:3000"
+        - "https://d1cqiieioszb2s.cloudfront.net"
       allowMethods:
         - GET
         - POST
