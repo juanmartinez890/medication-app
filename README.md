@@ -11,6 +11,43 @@ A serverless medication management system built with AWS Lambda, API Gateway, Dy
 - **TypeScript**: Type-safe development
 - **Serverless Framework**: Infrastructure as code
 
+### Architecture Choices
+
+From the architectural side, the requirement was to use AWS Lambda. I decided to build the backend using Lambda functions instead of containers because Lambda works really well with API Gateway and makes the system scale horizontally without extra effort. There’s no need to manage servers or worry about traffic spikes, which fits the scope of this project.
+
+For the database, I chose DynamoDB. The app doesn’t need complex joins, and DynamoDB is a great match for simple, well-defined access patterns. It also integrates smoothly with Lambda and scales automatically, so both layers of the system grow together without maintenance.
+
+I also planned to use SQS to handle dose creation asynchronously. The idea is that when a medication is created, a message is sent to a queue so another process can generate the dose records in the background. This keeps the main request fast and prevents any delays when creating medications. As part of the architecture, I also included EventBridge to run a daily scheduled job. The goal is for that job to send events to SQS so new future doses can continue to be created automatically. The scheduled job is not implemented yet, but it is part of the long-term plan for the system.
+
+For the database model, I decided to store the medication schedule inside the medication record. The requirements state that a medication cannot exist without a schedule, so separating them would add unnecessary complexity. For doses, I decided to pre-generate all dose records for the next 7 days. This reduces computation during reads because the “upcoming doses” endpoint can simply query existing items instead of calculating dates every time. Storage is cheaper than repeated compute, and this design also sets us up for future analytics like tracking missed doses.
+
+#### Why the Keys Look Like This (PK and SK Design)
+
+The DynamoDB keys follow this pattern:
+
+PK: "CR#\<careRecipientId\>"
+
+SK: "MED#\<medicationId\>"
+
+This structure was chosen because DynamoDB works best when data that belongs together shares the same partition key. By using:
+
+PK = CR#12345
+
+We group all data for one care recipient in the same partition.
+
+SK = MED#98765
+
+We uniquely identify each medication under that care recipient.
+
+This design makes it easy to:
+
+- get all medications for a specific care recipient
+- add doses below the same PK (e.g., SK = DOSE#\<medicationId\>#\<dueAt\>)
+- sort doses by date because the sort key is ordered
+- scale horizontally with predictable access patterns
+
+It's a simple but effective pattern often used in single-table DynamoDB designs.
+
 ## 📋 Prerequisites
 
 Before you begin, ensure you have the following installed:
