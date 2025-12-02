@@ -9,11 +9,111 @@ provider:
   # Uncomment to easily set up a custom domain. Read the docs for more details:
   # https://www.serverless.com/framework/docs/providers/aws/guide/domains
   # domain: api.example.com
+  httpApi:
+    cors: true
+    corsConfig:
+      allowOrigins:
+        - "http://localhost:5173"
+        - "http://localhost:3000"
+      allowMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowHeaders:
+        - Content-Type
+        - Authorization
+        - X-Amz-Date
+        - X-Api-Key
+        - X-Amz-Security-Token
+      maxAge: 86400
+  environment:
+    MEDICATIONS_TABLE_NAME: ${self:service}-medications-${sls:stage}
+    DOSE_GENERATION_QUEUE_URL:
+      Ref: DoseGenerationQueue
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:BatchWriteItem
+            - dynamodb:BatchGetItem
+          Resource:
+            - "arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${self:service}-medications-${sls:stage}"
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+          Resource:
+            - Fn::GetAtt:
+                - DoseGenerationQueue
+                - Arn
+        - Effect: Allow
+          Action:
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueAttributes
+          Resource:
+            - Fn::GetAtt:
+                - DoseGenerationQueue
+                - Arn
 
 functions:
-  hello:
-    handler: src/handlers/hello.handler
+  createMedication:
+    handler: dist/handlers/createMedication.handler
     events:
       - httpApi:
-          path: /hello
+          path: /medications
+          method: post
+  getUpcomingDoses:
+    handler: dist/handlers/getUpcomingDoses.handler
+    events:
+      - httpApi:
+          path: /care-recipients/{careRecipientId}/doses/upcoming
           method: get
+  markDoseAsTaken:
+    handler: dist/handlers/markDoseAsTaken.handler
+    events:
+      - httpApi:
+          path: /care-recipients/{careRecipientId}/doses/taken
+          method: post
+  generateDoses:
+    handler: dist/handlers/generateDoses.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - DoseGenerationQueue
+              - Arn
+          batchSize: 10
+
+resources:
+  Resources:
+    MedicationsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.MEDICATIONS_TABLE_NAME}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
+    DoseGenerationQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-dose-generation-${sls:stage}
+        VisibilityTimeout: 300
+        MessageRetentionPeriod: 1209600
+        ReceiveMessageWaitTimeSeconds: 20
