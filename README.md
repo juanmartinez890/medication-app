@@ -88,8 +88,9 @@ After deployment, you'll see output with your API endpoints:
 ```
 endpoints:
   POST - https://xxxxx.execute-api.us-east-1.amazonaws.com/medications
-  GET - https://xxxxx.execute-api.us-east-1.amazonaws.com/care-recipients/{careRecipientId}/doses/upcoming
+  GET  - https://xxxxx.execute-api.us-east-1.amazonaws.com/care-recipients/{careRecipientId}/doses/upcoming
   POST - https://xxxxx.execute-api.us-east-1.amazonaws.com/care-recipients/{careRecipientId}/doses/taken
+  POST - https://xxxxx.execute-api.us-east-1.amazonaws.com/care-recipients/{careRecipientId}/medications/{medicationId}/inactive
 ```
 
 **Note:** Save the base URL (e.g., `https://xxxxx.execute-api.us-east-1.amazonaws.com`) for testing.
@@ -262,7 +263,7 @@ Create a new medication record.
 
 ### GET `/care-recipients/{careRecipientId}/doses/upcoming`
 
-Get all upcoming doses for a care recipient.
+Get all upcoming doses for a care recipient. Doses belonging to **inactive medications** are automatically filtered out and will not be returned.
 
 **Path Parameters:**
 - `careRecipientId` (required)
@@ -271,7 +272,7 @@ Get all upcoming doses for a care recipient.
 
 ### POST `/care-recipients/{careRecipientId}/doses/taken`
 
-Mark a dose as taken.
+Mark a specific dose as taken.
 
 **Path Parameters:**
 - `careRecipientId` (required)
@@ -283,6 +284,17 @@ Mark a dose as taken.
   "dueAt": "ISO 8601 datetime (required)"
 }
 ```
+
+### POST `/care-recipients/{careRecipientId}/medications/{medicationId}/inactive`
+
+Mark a medication as inactive. Once a medication is inactive, its doses will no longer appear in the upcoming doses endpoint.
+
+**Path Parameters:**
+- `careRecipientId` (required)
+- `medicationId` (required)
+
+**Request Body:**  
+None.
 
 ## Validation Rules
 
