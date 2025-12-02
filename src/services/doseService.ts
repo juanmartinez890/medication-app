@@ -60,6 +60,11 @@ export class DoseService {
           return null;
         }
 
+        // Do not return doses for inactive medications
+        if (!medication.active) {
+          return null;
+        }
+
         return {
           doseId: dose.SK,
           medicationId: dose.medicationId,

@@ -84,6 +84,12 @@ functions:
       - httpApi:
           path: /care-recipients/{careRecipientId}/doses/taken
           method: post
+  markMedicationInactive:
+    handler: dist/handlers/markMedicationInactive.handler
+    events:
+      - httpApi:
+          path: /care-recipients/{careRecipientId}/medications/{medicationId}/inactive
+          method: post
   generateDoses:
     handler: dist/handlers/generateDoses.handler
     events:

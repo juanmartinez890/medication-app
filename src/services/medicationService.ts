@@ -104,5 +104,23 @@ export class MedicationService {
 
     return savedMedication;
   }
+
+  async deactivateMedication(
+    careRecipientId: string,
+    medicationId: string
+  ): Promise<Medication> {
+    const PK = `CARE#${careRecipientId}`;
+    const SK = `MED#${medicationId}`;
+
+    const updated = await this.repository.updateActive(PK, SK, false);
+
+    if (!updated) {
+      throw new Error(
+        "Medication not found. Ensure the careRecipientId and medicationId are correct."
+      );
+    }
+
+    return updated;
+  }
 }
 

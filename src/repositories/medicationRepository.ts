@@ -3,6 +3,7 @@ import {
   PutItemCommand,
   GetItemCommand,
   BatchGetItemCommand,
+  UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { Medication } from "../domain/types";
@@ -69,6 +70,30 @@ export class MedicationRepository {
     }
 
     return medications;
+  }
+
+  async updateActive(
+    PK: string,
+    SK: string,
+    active: boolean
+  ): Promise<Medication | null> {
+    const command = new UpdateItemCommand({
+      TableName: this.tableName,
+      Key: marshall({ PK, SK }),
+      UpdateExpression: "SET active = :active",
+      ExpressionAttributeValues: marshall({
+        ":active": active,
+      }),
+      ReturnValues: "ALL_NEW",
+    });
+
+    const result = await this.dynamoClient.send(command);
+
+    if (!result.Attributes) {
+      return null;
+    }
+
+    return unmarshall(result.Attributes) as Medication;
   }
 }
 
