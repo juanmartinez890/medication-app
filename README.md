@@ -2,7 +2,7 @@
 
 A serverless medication management system built with AWS Lambda, API Gateway, DynamoDB, and SQS. This application allows care recipients to manage their medications and track dose schedules.
 
-## 🏗️ Architecture
+## Architecture
 
 - **API Gateway (HTTP API)**: RESTful API endpoints
 - **AWS Lambda**: Serverless functions for business logic
@@ -21,19 +21,17 @@ I also planned to use SQS to handle dose creation asynchronously. The idea is th
 
 For the database model, I decided to store the medication schedule inside the medication record. The requirements state that a medication cannot exist without a schedule, so separating them would add unnecessary complexity. For doses, I decided to pre-generate all dose records for the next 7 days. This reduces computation during reads because the “upcoming doses” endpoint can simply query existing items instead of calculating dates every time. Storage is cheaper than repeated compute, and this design also sets us up for future analytics like tracking missed doses.
 
-<img width="884" height="515" alt="arch-design-backend" src="https://github.com/user-attachments/assets/65756a69-2c24-422f-a6a4-d184a1066f24" />
-
 #### Why the Keys Look Like This (PK and SK Design)
 
 The DynamoDB keys follow this pattern:
 
-PK: "CR#\<careRecipientId\>"
+PK: "CARE#\<careRecipientId\>"
 
 SK: "MED#\<medicationId\>"
 
 This structure was chosen because DynamoDB works best when data that belongs together shares the same partition key. By using:
 
-PK = CR#12345
+PK = CARE#12345
 
 We group all data for one care recipient in the same partition.
 
@@ -50,7 +48,7 @@ This design makes it easy to:
 
 It's a simple but effective pattern often used in single-table DynamoDB designs.
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before you begin, ensure you have the following installed:
 
@@ -59,7 +57,7 @@ Before you begin, ensure you have the following installed:
 - **AWS CLI** configured with appropriate credentials
 - **Serverless Framework** CLI (install globally: `npm install -g serverless`)
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Install Dependencies
 
@@ -106,7 +104,7 @@ serverless dev
 
 This starts a local development server that tunnels requests to AWS Lambda.
 
-## 🧪 Testing the API
+## Testing the API
 
 ### Prerequisites for Testing
 
@@ -172,14 +170,13 @@ curl -X POST https://YOUR_API_URL/medications \
   }'
 ```
 
-#### Step 3: Wait for Dose Generation
+#### Step 3: Dose Generation
 
 After creating medications, the system automatically:
-1. Publishes a message to SQS
-2. Triggers a Lambda function to generate 30 days of doses
-3. Stores doses in DynamoDB
+1. Generates all dose records synchronously for the next 7 days
+2. Stores those dose records in DynamoDB
 
-**Wait 10-30 seconds** for the background process to complete.
+This happens during the medication creation request, so upcoming doses are available immediately. SQS remains in the architecture as a fallback mechanism if synchronous generation fails or for future scheduled jobs.
 
 #### Step 4: Get Upcoming Doses
 
@@ -241,7 +238,7 @@ Get upcoming doses again - the taken dose should no longer appear (since it's no
 curl https://YOUR_API_URL/care-recipients/67891/doses/upcoming
 ```
 
-## 📚 API Endpoints
+## API Endpoints
 
 ### POST `/medications`
 
@@ -285,7 +282,7 @@ Mark a dose as taken.
 }
 ```
 
-## 🔍 Validation Rules
+## Validation Rules
 
 ### Daily Medications
 - `timesOfDay` must be provided (array of "HH:MM" format times)
@@ -297,7 +294,7 @@ Mark a dose as taken.
 - `timesOfDay` must be `null`
 - Days: `0` = Sunday, `1` = Monday, ..., `6` = Saturday
 
-## 🗑️ Cleanup
+## Cleanup
 
 To remove all AWS resources:
 
@@ -307,7 +304,7 @@ serverless remove
 
 **Warning:** This will delete the DynamoDB table and all data!
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 medication-app/
@@ -335,7 +332,7 @@ medication-app/
 └── package.json
 ```
 
-## 🛠️ Development Commands
+## Development Commands
 
 ```bash
 # Install dependencies
@@ -354,7 +351,32 @@ npm run dev
 serverless remove
 ```
 
-## 🔐 Security Notes
+## Running Tests
+
+This project uses Jest with TypeScript (via ts-jest) to test the core business logic in the `services` layer. All AWS and database calls are mocked so tests are fast and do not touch real infrastructure.
+
+### Test Layout
+
+- Tests live under `tests/`, mirroring the structure of `src/`:
+  - `tests/services/doseGenerationService.test.ts`
+  - `tests/services/doseService.test.ts`
+  - `tests/services/medicationService.test.ts`
+
+These tests cover:
+- Dose generation rules (7 days ahead, DAILY vs WEEKLY)
+- PK/SK formatting and ID generation
+- Upcoming dose aggregation and medication enrichment
+- Validation and error handling in the service layer
+
+### Run All Tests
+
+From the project root:
+
+```bash
+npm test
+```
+
+## Security Notes
 
 - The API is currently **public** (no authentication)
 - For production, consider adding:
@@ -362,14 +384,14 @@ serverless remove
   - AWS Cognito integration
   - API keys or custom authorizers
 
-## 📝 Notes
+## Notes
 
-- Dose generation happens asynchronously via SQS (may take 10-30 seconds)
-- Doses are generated 30 days in advance
+- Dose generation now happens synchronously when a medication is created
+- Doses are generated 7 days in advance
 - Only doses with `status: "UPCOMING"` can be marked as taken
 - The `doseId` format is: `DOSE#<medicationId>#<ISO8601-timestamp>`
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### CORS Errors
 - Ensure CORS is configured in `serverless.yml` (already included)
@@ -384,6 +406,6 @@ serverless remove
 - Verify IAM permissions in `serverless.yml`
 - Ensure DynamoDB table exists and permissions are correct
 
-## 📄 License
+## License
 
 This project is part of a medication management system.
